@@ -41,12 +41,17 @@ class TokenStore(object):
         self.current = set()
 
     def search(self, base):
+        """
+        base is what user typed and wanted it to be completed
+        """
         words = itertools.chain(self.current, self.store)
         for token in words:
             score = test_subseq(base, token)
             if score is None:
                 continue
-            yield token, (score, len(token))
+            # yield token, (score, len(token))
+            # I don't see why the length of token matters
+            yield token, (score, 0)
 
     def store_buffer(self, buffer, base, cur_nr, cur_line):
         nr = buffer.number
@@ -113,5 +118,12 @@ class Buffer(Completor):
 
         res = list(res)
         res.sort(key=lambda x: (x[1], x[0]))
-        return [{'word': token, 'menu': '[ID]', 'offset': offset}
-                for token, _ in res]
+
+
+        # offset controls the column to dispaly the pop up menu, doesn't matter
+        # the completion list
+
+        # to Tiger: to debug change 'word' to have value f'{token} {score}
+        # {identifier}'
+        return [{'word': token, 'menu': f'[{score[0]}]', 'offset': offset}
+                for token, score in res]

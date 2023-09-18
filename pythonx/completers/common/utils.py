@@ -2,6 +2,7 @@
 
 import re
 from completor.utils import check_subseq
+from completor.tiger_utils import check_subseq_fuzzy
 
 REGEX_MAP = {
     # Spec: http://www.w3.org/TR/CSS2/syndata.html#characters
@@ -50,4 +51,5 @@ for k, v in list(REGEX_MAP.items()):
 
 
 def test_subseq(src, target):
-    return check_subseq(src, target)
+    return check_subseq_fuzzy(src, target)
+    # return check_subseq(src, target)
