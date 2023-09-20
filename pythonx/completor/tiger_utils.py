@@ -11,8 +11,11 @@ def check_subseq_fuzzy(src: str, target: str) -> int | None:
     if not src:
         return None
 
-    target_length = len(target)
+    mock_prefix = 'mock_'
+    if src.startswith(mock_prefix):
+        src = src.removeprefix(mock_prefix)
 
+    target_length = len(target)
     # first character must match
     if src[0].lower() != target[0].lower():
         return None

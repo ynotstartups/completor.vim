@@ -49,9 +49,19 @@ class TokenStore(object):
             score = test_subseq(base, token)
             if score is None:
                 continue
-            # yield token, (score, len(token))
-            # I don't see why the length of token matters
-            yield token, (score, 0)
+
+            # support completion when I want to mock a function in python
+            # in the following case
+            # @mock.patch("foo.bar.export_duplicates")
+            # def test_foo(self, mock_e?):
+
+            if base.startswith("mock_") and not token.startswith("mock_"):
+                yield f"mock_{token}", (score, 0)
+            else:
+                # yield token, (score, len(token))
+                # I don't see why the length of token matters
+                yield token, (score, 0)
+
 
     def store_buffer(self, buffer, base, cur_nr, cur_line):
         nr = buffer.number
