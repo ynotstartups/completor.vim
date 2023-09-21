@@ -41,14 +41,14 @@ class TokenStore(object):
         self.store = collections.deque(maxlen=10000)
         self.current = set()
 
-    def search(self, base) -> tuple[str, int]:
+    def search(self, src) -> tuple[str, int]:
         logger.info(f"\033[36m TokenStore search \033[0m")
         """
-        base is what user typed and wanted it to be completed
+        src is what user typed and wanted it to be completed
         """
         words = itertools.chain(self.current, self.store)
         for token in words:
-            result = check_subseq_fuzzy(base, token)
+            result = check_subseq_fuzzy(src, token)
             if result is None:
                 continue
             score, updated_token = result
@@ -56,7 +56,7 @@ class TokenStore(object):
             yield updated_token, score
 
 
-    def store_buffer(self, buffer, base, cur_nr, cur_line):
+    def store_buffer(self, buffer, src, cur_nr, cur_line):
         logger.info(f"\033[36m store buffer \033[0m")
         nr = buffer.number
         encoding = get_encoding(nr)
@@ -69,7 +69,7 @@ class TokenStore(object):
             data = ' '.join(itertools.chain(buffer[start:cur_line],
                                             buffer[cur_line + 1:end]))
             self.current = set(self.pat.findall(to_unicode(data, encoding)))
-            self.current.difference_update([base])
+            self.current.difference_update([src])
         elif buffer.valid and len(buffer) <= 10000:
             ftime = getftime(nr)
             if ftime < 0:
@@ -84,13 +84,13 @@ class TokenStore(object):
 
         logger.info(f"\033[36m store buffer end \033[0m")
 
-    def parse_buffers(self, base):
+    def parse_buffers(self, src):
         logger.info(f"\033[36m parse buffers \033[0m")
         nr = vim.current.buffer.number
         line, _ = vim.current.window.cursor
 
         for buffer in vim.buffers:
-            self.store_buffer(buffer, base, nr, line)
+            self.store_buffer(buffer, src, nr, line)
 
 
 token_store = TokenStore()
@@ -100,9 +100,9 @@ class Buffer(Completor):
     filetype = 'buffer'
     sync = True
 
-    def parse(self, base):
+    def parse(self, src):
         logger.info(f"\033[36m Buffer parse \033[0m")
-        match = word.search(base)
+        match = word.search(src)
         if not match:
             return []
         identifier = match.group()
@@ -118,20 +118,21 @@ class Buffer(Completor):
             if len(res) >= LIMIT:
                 break
 
-        # NOTE: base class Completor expects the offset in nr of bytes in the
+        # NOTE: src class Completor expects the offset in nr of bytes in the
         # buffer's encoding (Completor.start_column will also be in nr of bytes)
         current_buf_encoding = get_current_buffer_encoding()
-        offset = (len(to_bytes(base, current_buf_encoding)) -
+        offset = (len(to_bytes(src, current_buf_encoding)) -
                   len(to_bytes(identifier, current_buf_encoding)))
 
         res = list(res)
         res.sort(key=lambda x: x[1])
 
 
-        # offset controls the column to dispaly the pop up menu, doesn't matter
-        # the completion list
-
-        # to Tiger: to debug change 'word' to have value f'{token} {score}
-        # {identifier}'
-        return [{'word': token, 'menu': f'[{score}]', 'offset': offset}
-                for token, score in res]
+        return [
+            {
+                'word': token,
+                'menu': f'[{score},{identifier}]',
+                'offset': offset
+            }
+            for token, score in res
+        ]
