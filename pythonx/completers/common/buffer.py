@@ -8,7 +8,7 @@ import logging
 from completor import Completor, vim, LIMIT, get_encoding as get_current_buffer_encoding
 from completor.compat import to_unicode, to_bytes
 
-from .utils import test_subseq
+from completers.tiger_utils import check_subseq_fuzzy
 
 logger = logging.getLogger('completor')
 word = re.compile(r'[^\W\d]\w*$', re.U)
@@ -36,34 +36,28 @@ class TokenStore(object):
     pat = re.compile(r'[^\W\d]{3}\w{0,45}', re.U)
 
     def __init__(self):
+        logger.info(f"\033[36m TokenStore init \033[0m")
         self.cache = {}
         self.store = collections.deque(maxlen=10000)
         self.current = set()
 
-    def search(self, base):
+    def search(self, base) -> tuple[str, int]:
+        logger.info(f"\033[36m TokenStore search \033[0m")
         """
         base is what user typed and wanted it to be completed
         """
         words = itertools.chain(self.current, self.store)
         for token in words:
-            score = test_subseq(base, token)
-            if score is None:
+            result = check_subseq_fuzzy(base, token)
+            if result is None:
                 continue
+            score, updated_token = result
 
-            # support completion when I want to mock a function in python
-            # in the following case
-            # @mock.patch("foo.bar.export_duplicates")
-            # def test_foo(self, mock_e?):
-
-            if base.startswith("mock_") and not token.startswith("mock_"):
-                yield f"mock_{token}", (score, 0)
-            else:
-                # yield token, (score, len(token))
-                # I don't see why the length of token matters
-                yield token, (score, 0)
+            yield updated_token, score
 
 
     def store_buffer(self, buffer, base, cur_nr, cur_line):
+        logger.info(f"\033[36m store buffer \033[0m")
         nr = buffer.number
         encoding = get_encoding(nr)
 
@@ -88,7 +82,10 @@ class TokenStore(object):
                 self.store.clear()
                 self.store.extend(words)
 
+        logger.info(f"\033[36m store buffer end \033[0m")
+
     def parse_buffers(self, base):
+        logger.info(f"\033[36m parse buffers \033[0m")
         nr = vim.current.buffer.number
         line, _ = vim.current.window.cursor
 
@@ -104,6 +101,7 @@ class Buffer(Completor):
     sync = True
 
     def parse(self, base):
+        logger.info(f"\033[36m Buffer parse \033[0m")
         match = word.search(base)
         if not match:
             return []
@@ -113,10 +111,10 @@ class Buffer(Completor):
         token_store.parse_buffers(identifier)
 
         res = set()
-        for token, factor in token_store.search(identifier):
+        for token, score in token_store.search(identifier):
             if token == identifier:
                 continue
-            res.add((token, factor))
+            res.add((token, score))
             if len(res) >= LIMIT:
                 break
 
@@ -127,7 +125,7 @@ class Buffer(Completor):
                   len(to_bytes(identifier, current_buf_encoding)))
 
         res = list(res)
-        res.sort(key=lambda x: (x[1], x[0]))
+        res.sort(key=lambda x: x[1])
 
 
         # offset controls the column to dispaly the pop up menu, doesn't matter
@@ -135,5 +133,5 @@ class Buffer(Completor):
 
         # to Tiger: to debug change 'word' to have value f'{token} {score}
         # {identifier}'
-        return [{'word': token, 'menu': f'[{score[0]}]', 'offset': offset}
+        return [{'word': token, 'menu': f'[{score}]', 'offset': offset}
                 for token, score in res]

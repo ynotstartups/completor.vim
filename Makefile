@@ -10,3 +10,6 @@ endif
 
 
 .PHONY: js
+
+test:
+	pytest pythonx/completers/tiger_utils.py

@@ -1,7 +1,13 @@
 from thefuzz import fuzz
 
-def check_subseq_fuzzy(src: str, target: str) -> int | None:
+def check_subseq_fuzzy(src: str, target: str) -> tuple[int, str] | None:
     """Check if src is a subsequence of target.
+
+    1. support completion when I want to mock a function in python
+       in the following case
+        
+        @mock.patch("foo.bar.export_duplicates")
+        def test_foo(self, mock_e?):
 
     :param src:    what user types
     :param target: a word in buffer
@@ -11,6 +17,7 @@ def check_subseq_fuzzy(src: str, target: str) -> int | None:
     if not src:
         return None
 
+    original_src = src
     mock_prefix = 'mock_'
     if src.startswith(mock_prefix):
         src = src.removeprefix(mock_prefix)
@@ -26,13 +33,18 @@ def check_subseq_fuzzy(src: str, target: str) -> int | None:
         return None
 
     fuzz_ratio_score = fuzz.ratio(src, target)
-    # fuzz_partial_ratio_score = fuzz.partial_ratio(src, target)
 
     score = fuzz_ratio_score
-    # score += fuzz_partial_ratio_score
 
     # boost score by the length of target
     # prioritise completing long words
     score += target_length
 
-    return -1 * score
+    if original_src.startswith("mock_") and not target.startswith("mock_"):
+        return -1 * score, f"mock_{target}"
+    else:
+        return -1 * score, target
+
+def test_check_subseq_fuzzy():
+    assert check_subseq_fuzzy("abc", "abc") == (-100 - 3, "abc")
+    assert check_subseq_fuzzy("mock_abc", "abc") == (-100 - 3, "mock_abc")

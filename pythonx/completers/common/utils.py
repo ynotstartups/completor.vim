@@ -2,7 +2,7 @@
 
 import re
 from completor.utils import check_subseq
-from completor.tiger_utils import check_subseq_fuzzy
+# from completor.tiger_utils import check_subseq_fuzzy
 
 REGEX_MAP = {
     # Spec: http://www.w3.org/TR/CSS2/syndata.html#characters
