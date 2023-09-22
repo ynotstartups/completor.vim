@@ -11,7 +11,7 @@ from completor.compat import to_unicode, to_bytes
 from completers.tiger_utils import check_subseq_fuzzy
 
 logger = logging.getLogger('completor')
-word = re.compile(r'[^\W\d]\w*$', re.U)
+word_re_pattern = re.compile(r'[^\W\d]\w*$', re.U)
 
 
 def getftime(nr):
@@ -40,6 +40,7 @@ class TokenStore(object):
         self.cache = {}
         self.store = collections.deque(maxlen=10000)
         self.current = set()
+        
 
     def search(self, src) -> tuple[str, int]:
         logger.info(f"\033[36m TokenStore search \033[0m")
@@ -91,28 +92,30 @@ class TokenStore(object):
 
         for buffer in vim.buffers:
             self.store_buffer(buffer, src, nr, line)
+        logger.info(f"\033[36m parse buffers end \033[0m")
 
 
 token_store = TokenStore()
-
 
 class Buffer(Completor):
     filetype = 'buffer'
     sync = True
 
-    def parse(self, src):
+    def parse(self, user_src):
         logger.info(f"\033[36m Buffer parse \033[0m")
-        match = word.search(src)
-        if not match:
+        re_match = word_re_pattern.search(user_src)
+        if not re_match:
             return []
-        identifier = match.group()
-        if len(identifier) < self.get_option('min_chars'):
+        src = re_match.group()
+        if len(src) < self.get_option('min_chars'):
             return []
-        token_store.parse_buffers(identifier)
+        logger.info(f"\033[36m start token_store.parse_buffers(src) \033[0m")
+        token_store.parse_buffers(src)
+        logger.info(f"\033[36m end token_store.parse_buffers(src) \033[0m")
 
         res = set()
-        for token, score in token_store.search(identifier):
-            if token == identifier:
+        for token, score in token_store.search(src):
+            if token == src:
                 continue
             res.add((token, score))
             if len(res) >= LIMIT:
@@ -121,8 +124,8 @@ class Buffer(Completor):
         # NOTE: src class Completor expects the offset in nr of bytes in the
         # buffer's encoding (Completor.start_column will also be in nr of bytes)
         current_buf_encoding = get_current_buffer_encoding()
-        offset = (len(to_bytes(src, current_buf_encoding)) -
-                  len(to_bytes(identifier, current_buf_encoding)))
+        offset = (len(to_bytes(user_src, current_buf_encoding)) -
+                  len(to_bytes(src, current_buf_encoding)))
 
         res = list(res)
         res.sort(key=lambda x: x[1])
@@ -131,7 +134,7 @@ class Buffer(Completor):
         return [
             {
                 'word': token,
-                'menu': f'[{score},{identifier}]',
+                'menu': f'[{score},{src}]',
                 'offset': offset
             }
             for token, score in res

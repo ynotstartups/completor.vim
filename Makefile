@@ -13,3 +13,6 @@ endif
 
 test:
 	pytest pythonx/completers/tiger_utils.py
+
+logs:
+	tail -f pythonx/completor.log

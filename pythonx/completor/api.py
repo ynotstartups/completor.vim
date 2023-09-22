@@ -10,13 +10,15 @@ logger = logging.getLogger('completor')
 def _api(func):
     @functools.wraps(func)
     def wrapper():
+        # logger.info(f"\033[36m api func {func} start \033[0m")
         try:
-            return func(vim.bindeval('a:'))
+            result = func(vim.bindeval('a:'))
+            # logger.info(f"\033[36m api func {func} end \033[0m")
+            return result
         except Exception as e:
             logger.exception(e)
             raise
     return wrapper
-
 
 @_api
 def get_completer(args):
