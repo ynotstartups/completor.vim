@@ -33,7 +33,14 @@ def get_encoding(nr):
 
 
 class TokenStore(object):
-    pat = re.compile(r'[^\W\d]{3}\w{0,45}', re.U)
+    # Previous pattern ignores words with digits in the first 3 characters
+    # which doesn't work for words in oneview codebase such as t4a_curoholding
+    # So I removed the `\d` from the pattern
+    # pat = re.compile(r'[^\W\d]{3}\w{0,45}', re.U)
+
+    # \W - Matches any non-alphanumeric character; this is equivalent to the class [^a-zA-Z0-9_]
+    # \w - Matches any alphanumeric character; this is equivalent to the class [a-zA-Z0-9_].
+    pat = re.compile(r'[^\W]{3}\w{0,45}', re.U)
 
     def __init__(self):
         logger.info(f"\033[36m TokenStore init \033[0m")
