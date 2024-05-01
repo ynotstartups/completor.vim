@@ -32,7 +32,15 @@ def check_subseq_fuzzy(src: str, target: str) -> tuple[int, str] | None:
         return None
 
     # modify the target to boost the score
-    modified_target = target.replace("_", "").lower()
+
+    # Old Version
+    # modified_target = target.replace("_", "").lower()
+
+    # optimise for searching for typing `asscall` to return `_assert_called_once_with`
+    # instead of returning `assertEqual`
+    # because I realised that I tend to type in the first few characters of
+    # each word to look for a longer word
+    modified_target = "".join([word[:3] for word in target.split('_')])
 
     fuzz_ratio_score = fuzz.ratio(modified_src, modified_target)
 

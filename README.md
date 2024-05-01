@@ -1,6 +1,21 @@
 Completor
 =========
 
+Tiger Notes
+-----------
+
+High Level Of How The Completor Works
+
+1. parse buffers text into tokens
+2. User inputs query, processes query, fuzzy matches with processed tokens
+3. returns ranked tokens for user to pick
+
+Important Files
+
+1. `pythonx/completers/common/buffer.py` - finding target tokens from buffer
+2. `pythonx/completers/tiger_utils.py` `check_subseq_fuzzy`- ranking algorithm
+
+
 [![Test Status](https://github.com/maralla/completor.vim/workflows/unit%20test/badge.svg)](https://github.com/maralla/completor.vim/actions)
 
 Completor is an asynchronous code completion framework for vim8. New features
