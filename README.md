@@ -14,6 +14,7 @@ Important Files
 
 1. `pythonx/completers/common/buffer.py` - finding target tokens from buffer
 2. `pythonx/completers/tiger_utils.py` `check_subseq_fuzzy`- ranking algorithm
+3. `pythonx/completor.log` - log file contains errors and runtime info
 
 
 [![Test Status](https://github.com/maralla/completor.vim/workflows/unit%20test/badge.svg)](https://github.com/maralla/completor.vim/actions)

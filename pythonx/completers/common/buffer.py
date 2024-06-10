@@ -55,7 +55,10 @@ class TokenStore(object):
         src is what user typed and wanted it to be completed
         """
         words = itertools.chain(self.current, self.store)
+        logger.info(f"\033[36m self.current {sorted(self.current)}\033[0m")
+        logger.info(f"\033[36m self.store {sorted(self.store)}\033[0m")
         for token in words:
+            logger.info(f"\033[36m token {token}\033[0m")
             result = check_subseq_fuzzy(src, token)
             if result is None:
                 continue
@@ -125,7 +128,9 @@ class Buffer(Completor):
             if token == src:
                 continue
             res.add((token, score))
-            if len(res) >= LIMIT:
+            # Tiger note: the original number is >= 50
+            if len(res) >= 500:
+                logger.info(f"\033[36m reaches search limit \033[0m")
                 break
 
         # NOTE: src class Completor expects the offset in nr of bytes in the

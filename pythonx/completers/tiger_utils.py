@@ -1,6 +1,7 @@
 from thefuzz import fuzz
 
 MOCK_PREFIX = 'mock_'
+TEST_PREFIX = 'test_'
 
 def check_subseq_fuzzy(src: str, target: str) -> tuple[int, str] | None:
     """Check if src is a subsequence of target.
@@ -19,11 +20,18 @@ def check_subseq_fuzzy(src: str, target: str) -> tuple[int, str] | None:
     if not src:
         return None
 
-    modified_src = src.removeprefix(MOCK_PREFIX)
+    # when we want to complete `test_`, we are looking for a function not other
+    # test names
+    if src.startswith(TEST_PREFIX) and target.startswith(TEST_PREFIX):
+        return None
+    elif src.startswith(MOCK_PREFIX) and target.startswith(MOCK_PREFIX):
+        return None
+
+    modified_src = src.removeprefix(MOCK_PREFIX).removeprefix(TEST_PREFIX)
 
     # first character must match, case insensitve
-    if modified_src[0].lower() != target[0].lower():
-        return None
+    # if modified_src[0].lower() != target[0].lower():
+    #     return None
 
     # if length of what user wants to complete is longer then target
     # remove this target
@@ -48,10 +56,14 @@ def check_subseq_fuzzy(src: str, target: str) -> tuple[int, str] | None:
 
     # boost score by the length of target
     # prioritise completing long words
-    score += target_length
+    score += min(target_length, 10)
 
     if src.startswith(MOCK_PREFIX) and not target.startswith(MOCK_PREFIX):
         return -1 * score, f"{MOCK_PREFIX}{target}"
+    elif src.startswith(TEST_PREFIX):
+        # when targets is a private function `_foo_bar`
+        # we remove the additional `_`
+        return -1 * score, f"{TEST_PREFIX}{target.removeprefix('_')}"
     else:
         return -1 * score, target
 
