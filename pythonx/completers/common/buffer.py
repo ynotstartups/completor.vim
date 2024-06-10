@@ -8,10 +8,76 @@ import logging
 from completor import Completor, vim, LIMIT, get_encoding as get_current_buffer_encoding
 from completor.compat import to_unicode, to_bytes
 
-from completers.tiger_utils import check_subseq_fuzzy
+from difflib import SequenceMatcher
 
 logger = logging.getLogger('completor')
 word_re_pattern = re.compile(r'[^\W\d]\w*$', re.U)
+
+MOCK_PREFIX = 'mock_'
+TEST_PREFIX = 'test_'
+
+def similarity(a, b):
+    return SequenceMatcher(None, a, b).ratio()
+
+def check_subseq_fuzzy(src: str, target: str) -> tuple[int, str] | None:
+    """Check if src is a subsequence of target.
+
+    1. support completion when I want to mock a function in python
+       in the following case
+        
+        @mock.patch("foo.bar.export_duplicates")
+        def test_foo(self, mock_e?):
+
+    :param src:    what user types
+    :param target: a word in buffer
+
+    :return score:
+    """
+    if not src:
+        return None
+
+    # when we want to complete `test_`, we are looking for a function not other
+    # test names
+    if src.startswith(TEST_PREFIX) and target.startswith(TEST_PREFIX):
+        return None
+    elif src.startswith(MOCK_PREFIX) and target.startswith(MOCK_PREFIX):
+        return None
+
+    modified_src = src.removeprefix(MOCK_PREFIX).removeprefix(TEST_PREFIX)
+
+    # first character must match, case sensitve
+    if modified_src[0] != target[0]:
+        return None
+
+    # if length of what user wants to complete is longer then target
+    # remove this target
+    target_length = len(target)
+    if len(modified_src) > target_length:
+        return None
+
+    # modify the target to boost the score
+
+    # optimise for searching for typing `asscall` to return `_assert_called_once_with`
+    # instead of returning `assertEqual`
+    # because I realised that I tend to type in the first few characters of
+    # each word to look for a longer word
+    modified_target = "".join([word[:3] for word in target.split('_')])
+
+    # score = fuzz.ratio(modified_src, modified_target)
+    score = similarity(modified_src, modified_target)
+
+    # boost score by the length of target
+    # prioritise completing long words
+    # score += min(target_length, 10)
+
+    if src.startswith(MOCK_PREFIX) and not target.startswith(MOCK_PREFIX):
+        return -1 * score, f"{MOCK_PREFIX}{target}"
+    elif src.startswith(TEST_PREFIX):
+        # when targets is a private function `_foo_bar`
+        # we remove the additional `_`
+        return -1 * score, f"{TEST_PREFIX}{target.removeprefix('_')}"
+    else:
+        return -1 * score, target
 
 
 def getftime(nr):
