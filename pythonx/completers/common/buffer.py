@@ -34,14 +34,15 @@ def check_subseq_fuzzy(src: str, target: str) -> tuple[float, str] | None:
     if not src:
         return None
 
-    # first character must match, case sensitve
+    # first character must match, case sensitive.
+    # to quickly rule out majority of non-matching words, even though it makes
+    # UX a bit harder.
     if src[0] != target[0]:
         return None
 
     # if length of what user wants to complete is longer then target
     # remove this target
-    target_length = len(target)
-    if len(src) > target_length:
+    if len(src) > len(target):
         return None
 
     # modify the target to boost the score based on my input behaviour
