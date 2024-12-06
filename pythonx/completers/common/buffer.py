@@ -16,83 +16,69 @@ word_re_pattern = re.compile(r'[^\W\d]\w*$', re.U)
 MOCK_PREFIX = 'mock_'
 TEST_PREFIX = 'test_'
 
+# for example, target would be a python classname, e.g. "FeeProfile"
+python_class_name_re_pattern = re.compile('[A-Z][^A-Z]*')
+
 def similarity(a, b):
     return SequenceMatcher(None, a, b).ratio()
 
-def check_subseq_fuzzy(src: str, target: str) -> tuple[int, str] | None:
-    """Check if src is a subsequence of target.
+def check_subseq_fuzzy(src: str, target: str) -> tuple[float, str] | None:
+    """
+    :param src:    user inputted text e.g. 'chsufuz'
+    :param target: a word in buffer e.g. 'check_subseq_fuzzy'
 
-    1. support completion when I want to mock a function in python
-       in the following case
-        
-        @mock.patch("foo.bar.export_duplicates")
-        def test_foo(self, mock_e?):
-
-    :param src:    what user types
-    :param target: a word in buffer
-
-    :return score:
+    returns 
+    either calculated similarity score from 0 to 1 and original target
+    or None, meaning no match
     """
     if not src:
         return None
 
-    # when we want to complete `test_`, we are looking for a function not other
-    # test names
-    if src.startswith(TEST_PREFIX) and target.startswith(TEST_PREFIX):
-        return None
-    elif src.startswith(MOCK_PREFIX) and target.startswith(MOCK_PREFIX):
-        return None
-
-    modified_src = src.removeprefix(MOCK_PREFIX).removeprefix(TEST_PREFIX)
-
     # first character must match, case sensitve
-    if modified_src[0] != target[0]:
+    if src[0] != target[0]:
         return None
 
     # if length of what user wants to complete is longer then target
     # remove this target
     target_length = len(target)
-    if len(modified_src) > target_length:
+    if len(src) > target_length:
         return None
 
-    # modify the target to boost the score
+    # modify the target to boost the score based on my input behaviour
 
-    # optimise for searching for typing `asscall` to return `_assert_called_once_with`
+    # optimised for searching for typing `asscall` to return `_assert_called_once_with`
     # instead of returning `assertEqual`
     # because I realised that I tend to type in the first few characters of
     # each word to look for a longer word
-    modified_target = "".join([word[:3] for word in target.split('_')])
-
-    # score = fuzz.ratio(modified_src, modified_target)
-    score = similarity(modified_src, modified_target)
-
-    # boost score by the length of target
-    # prioritise completing long words
-    # score += min(target_length, 10)
-
-    if src.startswith(MOCK_PREFIX) and not target.startswith(MOCK_PREFIX):
-        return -1 * score, f"{MOCK_PREFIX}{target}"
-    elif src.startswith(TEST_PREFIX):
-        # when targets is a private function `_foo_bar`
-        # we remove the additional `_`
-        return -1 * score, f"{TEST_PREFIX}{target.removeprefix('_')}"
+    if "_" in target:
+        # this target would be a python varaible e.g. "restrict_field_changes"
+        # or constant "T4A_FEE_PROFILE_VALUE_FIELDS_MAPPING"
+        modified_target = "".join([word[:3] for word in target.split('_')])
+    elif target[0].islower() and "_" not in target:
+        # this target is a single word like e.g. "filename"
+        modified_target = target
     else:
-        return -1 * score, target
+        # this target is a python classname
+        # e.g. "FeeProfile" then `modified_target` will be "FeePro"
+        modified_target = "".join([word[:3] for word in re.findall(python_class_name_re_pattern, target)])
+
+    score = similarity(src, modified_target)
+    return score, target
 
 
-def getftime(nr):
+def getftime(buffer_number):
     try:
         bufname = vim.Function('bufname')
         ftime = vim.Function('getftime')
-        return ftime(bufname(nr))
+        return ftime(bufname(buffer_number))
     except vim.error:
         return -1
 
 
-def get_encoding(nr):
+def get_encoding(buffer_number):
     try:
         getbufvar = vim.Function('getbufvar')
-        encoding = getbufvar(nr, '&encoding')
+        encoding = getbufvar(buffer_number, '&encoding')
     except vim.error:
         encoding = ''
     return to_unicode(encoding or 'utf-8', 'utf-8')
@@ -133,12 +119,12 @@ class TokenStore(object):
             yield updated_token, score
 
 
-    def store_buffer(self, buffer, src, cur_nr, cur_line):
+    def store_buffer(self, buffer, src, current_buffer_number, cur_line):
         logger.info(f"\033[36m store buffer \033[0m")
-        nr = buffer.number
-        encoding = get_encoding(nr)
+        buffer_number = buffer.number
+        encoding = get_encoding(buffer_number)
 
-        if nr == cur_nr:
+        if buffer_number == current_buffer_number:
             start = cur_line - 1000
             end = cur_line + 1000
             if start < 0:
@@ -148,11 +134,11 @@ class TokenStore(object):
             self.current = set(self.pat.findall(to_unicode(data, encoding)))
             self.current.difference_update([src])
         elif buffer.valid and len(buffer) <= 10000:
-            ftime = getftime(nr)
+            ftime = getftime(buffer_number)
             if ftime < 0:
                 return
-            if nr not in self.cache or ftime > self.cache[nr]['t']:
-                self.cache[nr] = {'t': ftime}
+            if buffer_number not in self.cache or ftime > self.cache[buffer_number]['t']:
+                self.cache[buffer_number] = {'t': ftime}
                 data = to_unicode(' '.join(buffer[:]), encoding)
                 words = set(self.store)
                 words.update(set(self.pat.findall(data)))
@@ -163,11 +149,11 @@ class TokenStore(object):
 
     def parse_buffers(self, src):
         logger.info(f"\033[36m parse buffers \033[0m")
-        nr = vim.current.buffer.number
+        buffer_number = vim.current.buffer.number
         line, _ = vim.current.window.cursor
 
         for buffer in vim.buffers:
-            self.store_buffer(buffer, src, nr, line)
+            self.store_buffer(buffer, src, buffer_number, line)
         logger.info(f"\033[36m parse buffers end \033[0m")
 
 
@@ -199,20 +185,21 @@ class Buffer(Completor):
                 logger.info(f"\033[36m reaches search limit \033[0m")
                 break
 
-        # NOTE: src class Completor expects the offset in nr of bytes in the
-        # buffer's encoding (Completor.start_column will also be in nr of bytes)
+        # NOTE: src class Completor expects the offset in number of bytes in the
+        # buffer's encoding (Completor.start_column will also be in number of bytes)
         current_buf_encoding = get_current_buffer_encoding()
         offset = (len(to_bytes(user_src, current_buf_encoding)) -
                   len(to_bytes(src, current_buf_encoding)))
 
         res = list(res)
-        res.sort(key=lambda x: x[1])
-
+        # x[1] is similarity scores, the higher the better
+        # reverse = True is needed because python by default sorts from low to high
+        res.sort(key=lambda x: x[1], reverse=True)
 
         return [
             {
                 'word': token,
-                'menu': f'[{score},{src}]',
+                'menu': f'[{score:.2f},{src}]',
                 'offset': offset
             }
             for token, score in res

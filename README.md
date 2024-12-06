@@ -6,15 +6,15 @@ Tiger Notes
 
 High Level Of How The Completor Works
 
-1. parse buffers text into tokens
-2. User inputs query, processes query, fuzzy matches with processed tokens
+1. parse buffers text into `word tokens`
+2. user inputs text to fuzzy matches with _processed_ tokens
 3. returns ranked tokens for user to pick
 
 Important Files
 
 1. `pythonx/completers/common/buffer.py` - finding target tokens from buffer
-2. `pythonx/completers/tiger_utils.py` `check_subseq_fuzzy`- ranking algorithm
-3. `pythonx/completor.log` - log file contains errors and runtime info
+2. `pythonx/completor.log` - `make logs` to see log file contains errors and
+   runtime info
 
 
 [![Test Status](https://github.com/maralla/completor.vim/workflows/unit%20test/badge.svg)](https://github.com/maralla/completor.vim/actions)
